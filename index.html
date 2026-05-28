@@ -362,6 +362,7 @@
   <div style="color:rgba(255,255,255,0.8);font-size:14px;">Menghubungkan ke server...</div>
   <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
 </div>
+
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- ═══════════ LOGIN PAGE ═══════════ -->
@@ -369,7 +370,7 @@
   <div class="login-box">
     <div class="login-logo">
       <div class="ball">⚽</div>
-      <h1>TUNA MUDA FC</h1>
+      <h1>TUNAS MUDA FC</h1>
       <p>Sistem Keuangan Transparan</p>
     </div>
     <div class="login-tabs">
@@ -421,6 +422,19 @@
 
     <!-- Stats -->
     <div class="stats-row" id="stats-row"></div>
+
+    <!-- Tunggakan -->
+    <div id="tunggakan-section" style="display:none;margin-bottom:20px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">⚠️ Peringatan Tunggakan</span>
+          <span id="tunggakan-count" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+        <div class="card-body" style="padding:14px 22px;">
+          <div id="tunggakan-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- Nav tabs -->
     <div class="nav-tabs">
@@ -587,6 +601,17 @@
 
     <div class="card">
       <div class="card-header">
+        <span class="card-title">🕒 Riwayat Bayar Kamu</span>
+        <span id="riwayat-user-label" style="font-size:12px;color:var(--muted);font-weight:600;"></span>
+      </div>
+      <div id="riwayat-list"></div>
+      <div id="riwayat-empty" class="empty" style="display:none;">
+        <div class="ico">📭</div>Belum ada data absensi
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
         <span class="card-title">💸 Riwayat Transaksi</span>
       </div>
       <div class="card-body" style="padding:0;">
@@ -605,7 +630,9 @@
     </div>
   </div>
 </div>
-
+<div style="text-align:center;padding:24px;font-size:12px;color:var(--muted);">
+  © 2026 TUNAS MUDA FC · Developed by BANGPET
+</div>
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -688,7 +715,7 @@ function startListeners() {
   // -- Absensi --
   onSnapshot(doc(db, 'data', 'absensi'), snap => {
     _absensi = snap.exists() ? (snap.data().map || {}) : {};
-    if (_ready) { renderAbsensi(); renderAnggotaTable(); renderPublicIfVisible(); }
+    if (_ready) { renderAbsensi(); renderAnggotaTable(); renderPublicIfVisible(); renderTunggakan(); }
   });
 
   // -- Settings --
@@ -809,6 +836,8 @@ function doLogin(role) {
     currentUser = document.getElementById('anggota-select').value;
   }
   showPage(currentRole === 'admin' ? 'admin' : 'public');
+  showPage(currentRole === 'admin' ? 'admin' : 'public');
+window.scrollTo(0, 0);
 }
 window.doLogin = doLogin;
 
@@ -833,6 +862,11 @@ function showPage(p) {
   if (p !== 'login') {
     document.getElementById('main-header').style.display = 'flex';
     document.getElementById('header-user').textContent = currentRole==='admin'?'👤 Admin':'👤 '+currentUser;
+    if (p === 'public') {
+  document.querySelector('.logo').textContent = 'Halo, ' + currentUser + ' 👋';
+} else {
+  document.querySelector('.logo').textContent = 'TUNAS MUDA';
+}
     if (p==='admin') { renderStats(); renderAbsensi(); renderTrx(); renderAnggotaTable(); renderSettings(); }
     if (p==='public') { renderPublic(); }
   } else {
@@ -872,6 +906,38 @@ function renderStats() {
       <div class="stat-label">📤 Total Keluar</div>
       <div class="stat-value red">${fmt(calcKeluar())}</div>
     </div>`;
+  renderTunggakan();
+}
+
+function renderTunggakan() {
+  const anggota = getAnggota();
+  const ab = getAbsensi();
+  const semuaMinggu = Object.keys(ab).sort();
+
+  const tunggakan = [];
+  anggota.forEach(nama => {
+    const mingguBelum = semuaMinggu.filter(wk => !ab[wk][nama]);
+    if (mingguBelum.length > 0) tunggakan.push({ nama, mingguBelum });
+  });
+
+  const section = document.getElementById('tunggakan-section');
+  if (!tunggakan.length) { section.style.display = 'none'; return; }
+
+  tunggakan.sort((a, b) => b.mingguBelum.length - a.mingguBelum.length);
+  section.style.display = 'block';
+  document.getElementById('tunggakan-count').textContent = tunggakan.length + ' anggota menunggak';
+  document.getElementById('tunggakan-list').innerHTML = tunggakan.map(t => {
+    const warna = t.mingguBelum.length >= 4 ? 'var(--red)' : '#d97706';
+    const bg    = t.mingguBelum.length >= 4 ? 'var(--red-pale)' : '#fff8e6';
+    const mingguLabel = t.mingguBelum.map(wk => weekLabel(wk)).join(', ');
+    return `<div style="background:${bg};border:1.5px solid ${warna};border-radius:10px;padding:10px 14px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:13px;font-weight:600;color:var(--text);">${t.nama}</span>
+        <span style="font-size:11px;font-weight:700;color:${warna};">${t.mingguBelum.length} minggu belum bayar</span>
+      </div>
+      <div style="font-size:11px;color:${warna};opacity:0.85;">📅 ${mingguLabel}</div>
+    </div>`;
+  }).join('');
 }
 
 // ════════════════════════════════════
@@ -895,6 +961,7 @@ async function tambahTransaksi() {
 window.tambahTransaksi = tambahTransaksi;
 
 async function hapusTrx(id) {
+  if (!confirm('Yakin hapus transaksi ini?')) return;
   try {
     await deleteDoc(doc(db, 'transaksi', id));
     toast('🗑️ Transaksi dihapus');
@@ -1096,16 +1163,33 @@ function renderPublic() {
   if (!trx.length) {
     tbody.innerHTML='';
     document.getElementById('public-trx-empty').style.display='block';
-    return;
+  } else {
+    document.getElementById('public-trx-empty').style.display='none';
+    tbody.innerHTML = trx.slice(0,10).map(t=>`
+      <tr>
+        <td style="white-space:nowrap;">${new Date(t.tgl).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
+        <td>${t.ket}</td>
+        <td><span class="badge ${t.jenis==='masuk'?'badge-in':'badge-out'}">${t.jenis==='masuk'?'Masuk':'Keluar'}</span></td>
+        <td style="font-weight:600;color:${t.jenis==='masuk'?'var(--green)':'var(--red)'};">${t.jenis==='masuk'?'+':'-'}${fmt(t.nominal)}</td>
+      </tr>`).join('');
   }
-  document.getElementById('public-trx-empty').style.display='none';
-  tbody.innerHTML = trx.slice(0,10).map(t=>`
-    <tr>
-      <td style="white-space:nowrap;">${new Date(t.tgl).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
-      <td>${t.ket}</td>
-      <td><span class="badge ${t.jenis==='masuk'?'badge-in':'badge-out'}">${t.jenis==='masuk'?'Masuk':'Keluar'}</span></td>
-      <td style="font-weight:600;color:${t.jenis==='masuk'?'var(--green)':'var(--red)'};">${t.jenis==='masuk'?'+':'-'}${fmt(t.nominal)}</td>
-    </tr>`).join('');
+
+  // Riwayat bayar per anggota
+  const semuaMinggu = Object.keys(_absensi).sort().reverse();
+  document.getElementById('riwayat-user-label').textContent = currentUser;
+  if (!semuaMinggu.length) {
+    document.getElementById('riwayat-empty').style.display = 'block';
+    document.getElementById('riwayat-list').innerHTML = '';
+  } else {
+    document.getElementById('riwayat-empty').style.display = 'none';
+    document.getElementById('riwayat-list').innerHTML = semuaMinggu.map(wk => {
+      const lunas = !!(_absensi[wk] && _absensi[wk][currentUser]);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 22px;border-bottom:1px solid var(--border);">
+        <span style="font-size:13px;color:var(--text);">${weekLabel(wk)}</span>
+        <span class="badge ${lunas?'badge-lunas':'badge-belum'}">${lunas?'✅ Lunas':'❌ Belum'}</span>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ════════════════════════════════════

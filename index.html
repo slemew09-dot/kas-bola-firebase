@@ -73,8 +73,12 @@
   .btn-logout:hover { background: rgba(255,255,255,0.2); }
 
   /* ── PAGES ── */
-  .page { display: none; }
-  .page.active { display: block; }
+.page { display: none; opacity: 0; }
+.page.active { display: block; animation: fadeIn .35s ease forwards; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
   /* ── LOGIN PAGE ── */
   #page-login {
@@ -166,8 +170,10 @@
   .main-wrap {
     max-width: 960px;
     margin: 0 auto;
-    padding: 28px 20px 48px;
+    padding: 20px 16px 48px;
+    overflow-x: hidden;
   }
+  body { overflow-x: hidden; }
   .page-title {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 28px;
@@ -441,6 +447,7 @@
       <button class="nav-tab active" onclick="adminTab('transaksi')">💰 Transaksi</button>
       <button class="nav-tab" onclick="adminTab('absensi')">📋 Absensi Kas</button>
       <button class="nav-tab" onclick="adminTab('anggota')">👥 Anggota</button>
+      <button class="nav-tab" onclick="adminTab('pengumuman')">📣 Pengumuman</button>
     </div>
 
     <!-- TAB: Transaksi -->
@@ -578,6 +585,39 @@
         </div>
       </div>
     </div>
+
+    <!-- TAB: Pengumuman -->
+    <div class="tab-panel" id="tab-pengumuman">
+      <div class="card">
+        <div class="card-header"><span class="card-title">📣 Buat Pengumuman Baru</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Judul Pengumuman</label>
+            <input type="text" id="ann-input-title" placeholder="Contoh: Jadwal Latihan Minggu Ini" />
+          </div>
+          <div class="form-group">
+            <label>Isi Pengumuman</label>
+            <textarea id="ann-input-body" rows="4" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);outline:none;resize:vertical;transition:border .2s;" placeholder="Tulis isi pengumuman di sini..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Tanggal Berakhir (Expired)</label>
+            <input type="date" id="ann-input-expired" />
+          </div>
+          <button class="btn btn-green" onclick="tambahPengumuman()">📣 Kirim Pengumuman</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Daftar Pengumuman Aktif</span>
+          <span id="ann-count" style="font-size:12px;color:var(--muted);">0 pengumuman</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <div id="ann-list-admin"></div>
+          <div id="ann-empty-admin" class="empty"><div class="ico">📭</div>Belum ada pengumuman</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -637,6 +677,46 @@
 </div>
 <!-- Toast -->
 <div id="toast"></div>
+
+<!-- ═══════════ ANNOUNCEMENT POPUP ═══════════ -->
+<div id="announcement-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);z-index:9000;align-items:center;justify-content:center;padding:20px;">
+  <div id="announcement-box" style="background:#fff;border-radius:24px;width:100%;max-width:420px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.3);animation:popIn .4s cubic-bezier(.175,.885,.32,1.275) forwards;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a7a3c,#25a354);padding:28px 28px 20px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-20px;right:-20px;font-size:100px;opacity:.08;">📣</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="background:rgba(255,255,255,.2);border-radius:10px;padding:7px 10px;font-size:18px;">📣</div>
+        <div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#f5c518;letter-spacing:2px;">PENGUMUMAN</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);">TUNAS MUDA FC</div>
+        </div>
+      </div>
+      <div id="ann-title" style="font-size:17px;font-weight:700;color:#fff;line-height:1.3;"></div>
+    </div>
+    <!-- Body -->
+    <div style="padding:22px 28px;">
+      <div id="ann-body" style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap;"></div>
+      <div id="ann-meta" style="margin-top:14px;font-size:11px;color:#9ca3af;"></div>
+    </div>
+    <!-- Nav dots -->
+    <div id="ann-dots" style="display:flex;justify-content:center;gap:6px;padding:0 28px 4px;"></div>
+    <!-- Footer -->
+    <div style="padding:16px 28px 24px;display:flex;gap:10px;align-items:center;justify-content:space-between;">
+      <div style="display:flex;gap:8px;">
+        <button id="ann-prev" onclick="annNav(-1)" style="display:none;background:#f3f4f6;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#374151;">‹ Prev</button>
+        <button id="ann-next" onclick="annNav(1)" style="display:none;background:#f3f4f6;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:#374151;">Next ›</button>
+      </div>
+      <button onclick="closeAnnouncement()" style="background:linear-gradient(135deg,#1a7a3c,#25a354);color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 14px rgba(26,122,60,.35);">Oke, Tutup ✕</button>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes popIn {
+  from { opacity:0; transform:scale(.85) translateY(20px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+</style>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -750,6 +830,7 @@ async function initData() {
     if (!setSnap) await fsSetDoc('data/settings', { adminPass: 'bola123', nominalKas: 10000 });
 
     startListeners();
+  startAnnListener();
     _ready = true;
     populateAnggotaSelect();
     document.getElementById('trx-tgl').value = new Date().toISOString().split('T')[0];
@@ -868,16 +949,16 @@ function showPage(p) {
 } else {
   document.querySelector('.logo').textContent = 'TUNAS MUDA';
 }
-    if (p==='admin') { renderStats(); renderAbsensi(); renderTrx(); renderAnggotaTable(); renderSettings(); }
-    if (p==='public') { renderPublic(); }
+    if (p==='admin') { renderStats(); renderAbsensi(); renderTrx(); renderAnggotaTable(); renderSettings(); renderAnnAdmin(); }
+    if (p==='public') { renderPublic(); setTimeout(showAnnouncement, 600); }
   } else {
     populateAnggotaSelect();
   }
 }
 
 function adminTab(t) {
-  document.querySelectorAll('.nav-tab').forEach((b,i) => b.classList.toggle('active', ['transaksi','absensi','anggota'][i]===t));
-  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', ['transaksi','absensi','anggota'][i]===t));
+  document.querySelectorAll('.nav-tab').forEach((b,i) => b.classList.toggle('active', ['transaksi','absensi','anggota','pengumuman'][i]===t));
+  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', ['transaksi','absensi','anggota','pengumuman'][i]===t));
 }
 window.adminTab = adminTab;
 
@@ -961,14 +1042,14 @@ async function tambahTransaksi() {
 }
 window.tambahTransaksi = tambahTransaksi;
 
-async function hapusTrx(id) {
-  if (!confirm('Yakin hapus transaksi ini?')) return;
+async function Trx(id) {
+  if (!confirm('Yakin  transaksi ini?')) return;
   try {
     await deleteDoc(doc(db, 'transaksi', id));
-    toast('🗑️ Transaksi dihapus');
-  } catch(e) { toast('❌ Gagal hapus'); }
+    toast('🗑️ Transaksi di');
+  } catch(e) { toast('❌ Gagal '); }
 }
-window.hapusTrx = hapusTrx;
+window.Trx = Trx;
 
 let showAllTrx = false;
 let filterBulan = '';
@@ -992,7 +1073,7 @@ function renderTrx() {
       <td>${t.ket}</td>
       <td><span class="badge ${t.jenis==='masuk'?'badge-in':'badge-out'}">${t.jenis==='masuk'?'Masuk':'Keluar'}</span></td>
       <td style="font-weight:600;color:${t.jenis==='masuk'?'var(--green)':'var(--red)'};">${t.jenis==='masuk'?'+':'-'}${fmt(t.nominal)}</td>
-      <td><button class="del-btn" onclick="hapusTrx('${t.id}')" title="Hapus">✕</button></td>
+      <td><button class="del-btn" onclick="Trx('${t.id}')" title="">✕</button></td>
     </tr>`).join('');
   const more = document.getElementById('trx-more');
   if (trx.length > 10 && !showAllTrx) {
@@ -1045,17 +1126,17 @@ async function toggleAbsen(nama) {
       await addDoc(collection(db, 'transaksi'), {
         jenis: 'masuk', nominal: nom,
         ket, tgl, waktu: serverTimestamp(),
-        _kasRef: `${currentWeek}__${nama}` // penanda unik buat hapus nanti
+        _kasRef: `${currentWeek}__${nama}` // penanda unik buat  nanti
       });
       toast(`✅ ${nama} lunas · Rp ${nom.toLocaleString('id-ID')} dicatat!`);
     } else {
-      // Hapus transaksi kas minggu ini punya dia
+      //  transaksi kas minggu ini punya dia
       const kasRef = `${currentWeek}__${nama}`;
       const match = _transaksi.find(t => t._kasRef === kasRef);
       if (match) {
         await deleteDoc(doc(db, 'transaksi', match.id));
       }
-      toast(`↩ ${nama} dibatalkan · transaksi dihapus`);
+      toast(`↩ ${nama} dibatalkan · transaksi di`);
     }
   } catch(e) {
     console.error(e);
@@ -1098,14 +1179,15 @@ async function tambahAnggota() {
 }
 window.tambahAnggota = tambahAnggota;
 
-async function hapusAnggota(nm) {
+async function Anggota(nm) {
+  if (!confirm(`Yakin hapus ${nm} dari daftar anggota?`)) return;
   const list = getAnggota().filter(a=>a!==nm);
   try {
     await fsSetDoc('data/anggota', { list });
-    toast('🗑️ '+nm+' dihapus');
-  } catch(e) { toast('❌ Gagal hapus anggota'); }
+    toast('🗑️ '+nm+' di');
+  } catch(e) { toast('❌ Gagal anggota'); }
 }
-window.hapusAnggota = hapusAnggota;
+window.Anggota = Anggota;
 
 function renderAnggotaTable() {
   const list = getAnggota();
@@ -1121,7 +1203,7 @@ function renderAnggotaTable() {
       <td style="font-weight:500;">${a}</td>
       <td style="color:var(--green);font-weight:600;">${fmt(lns * s.nominalKas)}</td>
       <td>${lns} minggu</td>
-      <td><button class="del-btn" onclick="hapusAnggota('${a.replace(/'/g,"\\'")}')">✕</button></td>
+      <td><button class="del-btn" onclick="Anggota('${a.replace(/'/g,"\\'")}')">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -1221,6 +1303,110 @@ function renderPublic() {
       </div>`;
     }).join('');
   }
+}
+
+// ════════════════════════════════════
+// PENGUMUMAN (Firestore)
+// ════════════════════════════════════
+let _pengumuman = [];
+let _annIndex = 0;
+
+function startAnnListener() {
+  const annQ = query(collection(db, 'pengumuman'), orderBy('waktu', 'desc'));
+  onSnapshot(annQ, snap => {
+    _pengumuman = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (_ready) renderAnnAdmin();
+  });
+}
+
+async function tambahPengumuman() {
+  const title   = document.getElementById('ann-input-title').value.trim();
+  const body    = document.getElementById('ann-input-body').value.trim();
+  const expired = document.getElementById('ann-input-expired').value;
+  if (!title)   return toast('⚠️ Isi judul pengumuman!');
+  if (!body)    return toast('⚠️ Isi isi pengumuman!');
+  if (!expired) return toast('⚠️ Pilih tanggal berakhir!');
+  try {
+    await addDoc(collection(db, 'pengumuman'), {
+      title, body, waktu: serverTimestamp(), expired,
+      tgl: new Date().toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'})
+    });
+    document.getElementById('ann-input-title').value   = '';
+    document.getElementById('ann-input-body').value    = '';
+    document.getElementById('ann-input-expired').value = '';
+    toast('✅ Pengumuman dikirim!');
+  } catch(e) { toast('❌ Gagal kirim pengumuman'); }
+}
+window.tambahPengumuman = tambahPengumuman;
+
+async function hapusPengumuman(id) {
+  if (!confirm('Yakin hapus pengumuman ini?')) return;
+  try {
+    await deleteDoc(doc(db, 'pengumuman', id));
+    toast('🗑️ Pengumuman dihapus');
+  } catch(e) { toast('❌ Gagal hapus'); }
+}
+window.hapusPengumuman = hapusPengumuman;
+
+function renderAnnAdmin() {
+  const today = new Date().toISOString().split('T')[0];
+  const list = _pengumuman;
+  document.getElementById('ann-count').textContent = list.length + ' pengumuman';
+  const el = document.getElementById('ann-list-admin');
+  const emp = document.getElementById('ann-empty-admin');
+  if (!list.length) { el.innerHTML = ''; emp.style.display = 'block'; return; }
+  emp.style.display = 'none';
+  el.innerHTML = list.map(a => {
+    const expired = a.expired || '';
+    const isExpired = expired && expired < today;
+    return `
+    <div style="padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;${isExpired?'opacity:.5':''}">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-weight:600;font-size:14px;color:var(--text);">${a.title}</span>
+          ${isExpired?'<span style="font-size:10px;background:var(--red-pale);color:var(--red);padding:2px 7px;border-radius:10px;font-weight:700;">EXPIRED</span>':'<span style="font-size:10px;background:var(--green-pale);color:var(--green);padding:2px 7px;border-radius:10px;font-weight:700;">AKTIF</span>'}
+        </div>
+        <div style="font-size:12px;color:var(--muted);white-space:pre-wrap;line-height:1.5;">${a.body.length>80?a.body.slice(0,80)+'…':a.body}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">📅 Dibuat: ${a.tgl||''} · ⏳ Berakhir: ${expired||'-'}</div>
+      </div>
+      <button class="del-btn" onclick="hapusPengumuman('${a.id}')" style="flex-shrink:0;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── POPUP ──
+function showAnnouncement() {
+  const today = new Date().toISOString().split('T')[0];
+  const aktif = _pengumuman.filter(a => !a.expired || a.expired >= today);
+  if (!aktif.length) return;
+  _pengumuman_aktif = aktif;
+  _annIndex = 0;
+  renderAnnPopup();
+  document.getElementById('announcement-overlay').style.display = 'flex';
+}
+let _pengumuman_aktif = [];
+
+function renderAnnPopup() {
+  const a = _pengumuman_aktif[_annIndex];
+  if (!a) return;
+  document.getElementById('ann-title').textContent = a.title;
+  document.getElementById('ann-body').textContent  = a.body;
+  document.getElementById('ann-meta').textContent  = a.tgl ? '📅 ' + a.tgl + (a.expired ? ' · ⏳ Berakhir: ' + a.expired : '') : '';
+  const total = _pengumuman_aktif.length;
+  document.getElementById('ann-dots').innerHTML = Array.from({length:total},(_,i) =>
+    `<div style="width:${i===_annIndex?20:8}px;height:8px;border-radius:4px;background:${i===_annIndex?'#1a7a3c':'#d1d5db'};transition:all .3s;"></div>`
+  ).join('');
+  document.getElementById('ann-prev').style.display = _annIndex > 0 ? 'block' : 'none';
+  document.getElementById('ann-next').style.display = _annIndex < total-1 ? 'block' : 'none';
+}
+
+window.annNav = function(dir) {
+  _annIndex = Math.max(0, Math.min(_pengumuman_aktif.length-1, _annIndex+dir));
+  renderAnnPopup();
+}
+
+window.closeAnnouncement = function() {
+  document.getElementById('announcement-overlay').style.display = 'none';
 }
 
 // ════════════════════════════════════

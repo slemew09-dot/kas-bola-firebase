@@ -407,7 +407,7 @@
 
 <!-- ═══════════ HEADER ═══════════ -->
 <header id="main-header" style="display:none;">
-  <div class="logo">TUNAS MUDA</div> <span></span> </div>
+  <div class="logo">TUNAS MUDA</div>
   <div class="header-right">
     <span class="badge-user" id="header-user">—</span>
     <button class="btn-logout" onclick="doLogout()">Keluar</button>
@@ -485,6 +485,9 @@
           <span style="font-size:12px;color:var(--muted)" id="trx-count">0 transaksi</span>
         </div>
         <div class="card-body" style="padding:0;">
+          <div style="padding:12px 22px 0;">
+            <input type="month" onchange="filterTrx(this.value)" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);">
+          </div>
           <div class="tbl-wrap">
             <table>
               <thead>
@@ -496,7 +499,6 @@
                   <th></th>
                 </tr>
               </thead>
-              <input type="month" onchange="filterTrx(this.value)" style="font-size:12px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);">
               <tbody id="trx-tbody"></tbody>
             </table>
             <div id="trx-more" style="display:none;text-align:center;padding:12px;font-size:13px;color:var(--green);cursor:pointer;font-weight:600;" onclick="lihatSemuaTrx()"></div>
@@ -836,8 +838,7 @@ function doLogin(role) {
     currentUser = document.getElementById('anggota-select').value;
   }
   showPage(currentRole === 'admin' ? 'admin' : 'public');
-  showPage(currentRole === 'admin' ? 'admin' : 'public');
-window.scrollTo(0, 0);
+  window.scrollTo(0, 0);
 }
 window.doLogin = doLogin;
 
@@ -1027,9 +1028,39 @@ function renderAbsensi() {
 async function toggleAbsen(nama) {
   const ab = JSON.parse(JSON.stringify(_absensi));
   if (!ab[currentWeek]) ab[currentWeek] = {};
-  ab[currentWeek][nama] = !ab[currentWeek][nama];
-  try { await fsSetDoc('data/absensi', { map: ab }); }
-  catch(e) { toast('❌ Gagal update absensi'); }
+  const wasLunas = !!ab[currentWeek][nama];
+  const nowLunas = !wasLunas;
+  ab[currentWeek][nama] = nowLunas;
+
+  try {
+    // Update absensi
+    await fsSetDoc('data/absensi', { map: ab });
+
+    const nom = (_settings.nominalKas || 10000);
+    const tgl = new Date().toISOString().split('T')[0];
+    const ket = `Kas ${nama} - ${weekLabel(currentWeek)}`;
+
+    if (nowLunas) {
+      // Tambah transaksi otomatis
+      await addDoc(collection(db, 'transaksi'), {
+        jenis: 'masuk', nominal: nom,
+        ket, tgl, waktu: serverTimestamp(),
+        _kasRef: `${currentWeek}__${nama}` // penanda unik buat hapus nanti
+      });
+      toast(`✅ ${nama} lunas · Rp ${nom.toLocaleString('id-ID')} dicatat!`);
+    } else {
+      // Hapus transaksi kas minggu ini punya dia
+      const kasRef = `${currentWeek}__${nama}`;
+      const match = _transaksi.find(t => t._kasRef === kasRef);
+      if (match) {
+        await deleteDoc(doc(db, 'transaksi', match.id));
+      }
+      toast(`↩ ${nama} dibatalkan · transaksi dihapus`);
+    }
+  } catch(e) {
+    console.error(e);
+    toast('❌ Gagal update absensi');
+  }
 }
 window.toggleAbsen = toggleAbsen;
 
